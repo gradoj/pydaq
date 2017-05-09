@@ -1,0 +1,43 @@
+Metadata-Version: 1.0
+Name: pydaqtools
+Version: 0.2.0
+Summary: Python Data Acquisition Tools
+Home-page: http://www.pydaqtools.org/
+Author: Joe Grado
+Author-email: gradoj@gmail.com
+License: BSD
+Download-URL: https://sourceforge.net/projects/pydaqtools/files/0.2.0/
+Description: pydaqtools
+        ===============================
+        
+        pydaqtools provides an interface for pc-compatible data-acquisition hardware for Python. Control analog/digital output or acquire analog/digital input for immediate analysis with Python for scientific or engineering applications. 
+        
+        Dependencies
+        ===============================
+        numpy
+        scipy(optional)
+        matplotlib(optional)
+        
+        Additional hardware drivers required:
+        nidaqmx(National Instruments)
+        nidaqmxbase(National Instruments)
+        pyAudio
+        
+        Support
+        ===============================
+        
+        URL: http://www.pydaqtools.org/
+        Mailing List: pydaqtools-users@lists.sourceforge.net
+        
+        
+Keywords: data acquisition nidaqmx nidaq national instruments daq
+Platform: UNKNOWN
+Classifier: Programming Language :: Python
+Classifier: Environment :: Console
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Topic :: Scientific/Engineering
+Classifier: Intended Audience :: Education
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX :: Linux

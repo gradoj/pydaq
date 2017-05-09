@@ -1,0 +1,46 @@
+(dp0
+S'14828'
+p1
+S'TCPIP'
+p2
+sS'13612'
+p3
+S'PCI Express'
+p4
+sS'14707'
+p5
+S'SCC'
+p6
+sS'14706'
+p7
+S'PXI Express'
+p8
+sS'12588'
+p9
+S'Unknown bus type'
+p10
+sS'12583'
+p11
+S'PXI'
+p12
+sS'12582'
+p13
+S'PCI'
+p14
+sS'14637'
+p15
+S'CompactDAQ'
+p16
+sS'12586'
+p17
+S'USB'
+p18
+sS'12585'
+p19
+S'PC Card/PCMCIA'
+p20
+sS'12584'
+p21
+S'SCXI'
+p22
+s.
