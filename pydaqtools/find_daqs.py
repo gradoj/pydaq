@@ -20,9 +20,9 @@ def create_classes():
         for i in range(0, len(nihandles)):
             nidaqs.append(pynidaq.pynidaq(nihandles[i]))
     except:
-        pass
-        #print "Unexpected error in pynidaq:", sys.exc_info()
-        #raise
+        #pass
+        print("Unexpected error in pynidaq:", sys.exc_info())
+        raise
 
     #get list of handles for each daq type
     try:

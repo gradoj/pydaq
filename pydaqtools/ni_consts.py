@@ -59,3 +59,7 @@ DAQmx_Val_LargeRng2Ctr = 10205 # Large Range with 2 Counters
 #    DAQmxReadBinaryI32, DAQmxReadBinaryU32, DAQmxReadDigitalU8, DAQmxReadDigitalU32,
 #    DAQmxReadDigitalLines, DAQmxReadCounterF64, DAQmxReadCounterU32 and DAQmxReadRaw ***
 DAQmx_Val_Auto = -1
+
+DAQmx_Val_CountUp = 10128
+DAQmx_Val_CountDown = 10124	
+DAQmx_Val_ExtControlled = 10326

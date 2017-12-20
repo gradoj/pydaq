@@ -14,6 +14,7 @@ try:
     import time
     import ni_consts as c
     import daq
+    import binascii
 except:
     raise
 
@@ -40,7 +41,8 @@ int32 = ctypes.c_long
 uInt32 = ctypes.c_ulong
 uInt64 = ctypes.c_ulonglong
 float64 = ctypes.c_double
-TaskHandle = uInt32
+#TaskHandle = uInt32
+TaskHandle = ctypes.c_int32()
 written = int32()
 pointsRead = uInt32()
 
@@ -49,7 +51,7 @@ def CHK(err):
     #a simple error checking routine
     if err < 0:
         buf_size = 1000
-        buf = ctypes.create_string_buffer('\000' * buf_size)
+        #buf = ctypes.create_string_buffer('\000' * buf_size)
         buf = ctypes.create_string_buffer(buf_size)
         nidaq.DAQmxGetErrorString(err,ctypes.byref(buf),buf_size)
         raise RuntimeError('nidaq call failed with error %d: %s'%(err,repr(buf.value)))
@@ -70,7 +72,7 @@ class pynidaq(daq.daq):
         #print "class", class_name, "created"
         self.__fillhwinfo(handle=handle)
 
-        
+        handle=ctypes.create_string_buffer(handle.encode('utf-8'))
 
         self.bus = getproductbus(handle)
         self.dll = 'nidaqmx'
@@ -98,9 +100,11 @@ class pynidaq(daq.daq):
                 handle='Dev1'):
         deviceunplugged = 0
 
-        self.simulated = numpy.zeros(1,dtype=numpy.uint32)
-        CHK(nidaq.DAQmxGetDevIsSimulated(handle, self.simulated.ctypes.data))
-        if(self.simulated):
+        handle=ctypes.create_string_buffer(handle.encode('utf-8'))
+        self.simulated = ctypes.c_int32()
+        
+        CHK(nidaq.DAQmxGetDevIsSimulated(handle, ctypes.byref(self.simulated)))
+        if(self.simulated == None):
             #print 'Simulated daq detected.\n'
             #logger.info('Simulated daq detected')
             pass
@@ -110,9 +114,10 @@ class pynidaq(daq.daq):
             #logger.info('Hardware daq detected.')
             pass
 
-        self.serialnumber = numpy.zeros(1,dtype=numpy.uint32)
-        nidaq.DAQmxGetDevSerialNum(handle, self.serialnumber.ctypes.data)
-        self.serial_number = hex(self.serialnumber)
+        self.serialnumber = ctypes.c_int32()
+        
+        nidaq.DAQmxGetDevSerialNum(handle, ctypes.byref(self.serialnumber))
+        self.serial_number = hex(int(self.serialnumber.value))
 
         if (self.serialnumber == 0):
             #print 'Device Not Connected.\n'
@@ -136,9 +141,10 @@ class pynidaq(daq.daq):
 
 
         if os.name == 'nt':
-            self.cserialnumber = numpy.zeros(1,dtype=numpy.uint32)
+            self.cserialnumber = ctypes.c_int32()
             #don't run this through CHK just fail and move on
-            if(nidaq.DAQmxGetCarrierSerialNum(handle, self.cserialnumber.ctypes.data) == 0):
+            
+            if(nidaq.DAQmxGetCarrierSerialNum(handle, ctypes.byref(self.cserialnumber)) == 0):
                 pass
             #print 'Carrier Serial Number:', hex(cserialnumber)         
             #print ""   
@@ -154,16 +160,16 @@ class pynidaq(daq.daq):
             return
 
         if os.name == 'nt':
-            self.atrigger = numpy.zeros(1,dtype=numpy.uint32)
-            nidaq.DAQmxGetDevAnlgTrigSupported(handle, self.atrigger.ctypes.data)
+            self.atrigger = ctypes.c_int32()
+            nidaq.DAQmxGetDevAnlgTrigSupported(handle, ctypes.byref(self.atrigger))
             if(self.atrigger):
                 pass
             #print 'Analog trigger supported.\n'
 
 
         if os.name == 'nt':    
-            self.dtrigger = numpy.zeros(1,dtype=numpy.uint32)
-            nidaq.DAQmxGetDevDigTrigSupported(handle, self.dtrigger.ctypes.data)
+            self.dtrigger = ctypes.c_int32()
+            nidaq.DAQmxGetDevDigTrigSupported(handle, ctypes.byref(self.dtrigger))
             if(self.dtrigger):
                 pass
                 #print 'Digital trigger supported.\n' 
@@ -171,14 +177,16 @@ class pynidaq(daq.daq):
                  
 
         #print 'Analog In Channels:'
-        self.aichannels = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevAIPhysicalChans(handle, self.aichannels.ctypes.data, uInt32(1000)))
-        self.aichannels = ''.join(list(self.aichannels)).split(', ')
+        #self.aichannels = numpy.zeros(1000,dtype=numpy.str_)
+        self.aichannels = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevAIPhysicalChans(handle, ctypes.byref(self.aichannels), uInt32(1000)))
+        
+        self.aichannels = ''.join(list(str(self.aichannels.value,'utf-8'))).split(', ')
         #print aichannels + '\n'
 
         if os.name == 'nt':
-            self.maxSchRate = numpy.zeros(1,dtype=numpy.float64)
-            if(nidaq.DAQmxGetDevAIMaxSingleChanRate(handle, self.maxSchRate.ctypes.data)):
+            self.maxSchRate = ctypes.c_double()
+            if(nidaq.DAQmxGetDevAIMaxSingleChanRate(handle, ctypes.byref(self.maxSchRate))):
                 pass
             else:
                 pass
@@ -186,8 +194,8 @@ class pynidaq(daq.daq):
                 #print ""
 
         if os.name == 'nt':
-            self.maxMchRate = numpy.zeros(1,dtype=numpy.float64)
-            if(nidaq.DAQmxGetDevAIMaxMultiChanRate(handle, self.maxMchRate.ctypes.data)):
+            self.maxMchRate = ctypes.c_double()
+            if(nidaq.DAQmxGetDevAIMaxMultiChanRate(handle, ctypes.byref(self.maxMchRate))):
                 pass
             else:
                 pass
@@ -195,8 +203,8 @@ class pynidaq(daq.daq):
                 #print ""
 
         if os.name == 'nt':
-            self.minSamplingRate = numpy.zeros(1,dtype=numpy.float64)
-            if(nidaq.DAQmxGetDevAIMinRate(handle, self.minSamplingRate.ctypes.data)):
+            self.minSamplingRate = ctypes.c_double()
+            if(nidaq.DAQmxGetDevAIMinRate(handle, ctypes.byref(self.minSamplingRate))):
                 pass
             else:
                 pass
@@ -204,8 +212,8 @@ class pynidaq(daq.daq):
                 #print ""
 
         if os.name == 'nt':
-            self.simSampling = numpy.zeros(1,dtype=numpy.uint32)
-            if(nidaq.DAQmxGetDevAISimultaneousSamplingSupported(handle, self.simSampling.ctypes.data)):
+            self.simSampling = ctypes.c_int32()
+            if(nidaq.DAQmxGetDevAISimultaneousSamplingSupported(handle, ctypes.byref(self.simSampling))):
                 pass
             else:
                 if(self.simSampling):
@@ -213,50 +221,57 @@ class pynidaq(daq.daq):
                 #print 'Simultaneous sampling supported\n'
 
         #print 'Analog Out Channels:'
-        self.aochannels = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevAOPhysicalChans(handle, self.aochannels.ctypes.data, uInt32(1000)))
-        self.aochannels = ''.join(list(self.aochannels)).split(', ')
+        #self.aochannels = numpy.zeros(1000,dtype=numpy.str_)
+        self.aochannels = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevAOPhysicalChans(handle, ctypes.byref(self.aochannels), uInt32(1000)))
+        self.aochannels = ''.join(list(str(self.aochannels.value,'utf-8'))).split(', ')
 
       
 
         #print aochannels, '\n'
 
         #print 'Digital In Lines:'
-        self.dils = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevDILines(handle, self.dils.ctypes.data, uInt32(1000)))
-        self.dils = ''.join(list(self.dils)).split(', ')
+        #self.dils = numpy.zeros(1000,dtype=numpy.str_)
+        self.dils = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevDILines(handle, ctypes.byref(self.dils), uInt32(1000)))
+        self.dils = ''.join(list(str(self.dils.value,'utf-8'))).split(', ')
         #print dils, '\n'
 
         #print 'Digital In Ports:'
-        self.dips = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevDIPorts(handle, self.dips.ctypes.data, uInt32(1000)))
-        self.dips = ''.join(list(self.dips)).split(', ')
+        #self.dips = numpy.zeros(1000,dtype=numpy.str_)
+        self.dips = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevDIPorts(handle, ctypes.byref(self.dips), uInt32(1000)))
+        self.dips = ''.join(list(str(self.dips.value,'utf-8'))).split(', ')
         #print dips, '\n'
 
         #print 'Digital Out Lines:'
-        self.dols = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevDOLines(handle, self.dols.ctypes.data, uInt32(1000)))
-        self.dols = ''.join(list(self.dols)).split(', ')
+        #self.dols = numpy.zeros(1000,dtype=numpy.str_)
+        self.dols = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevDOLines(handle, ctypes.byref(self.dols), uInt32(1000)))
+        self.dols = ''.join(list(str(self.dols.value,'utf-8'))).split(', ')
         #print dols, '\n'
 
         #print 'Digital Out Ports:'
-        self.dops = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevDOPorts(handle, self.dops.ctypes.data, uInt32(1000)))
-        self.dops = ''.join(list(self.dops)).split(', ')
+        #self.dops = numpy.zeros(1000,dtype=numpy.str_)
+        self.dops = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevDOPorts(handle, ctypes.byref(self.dops), uInt32(1000)))
+        self.dops = ''.join(list(str(self.dops.value,'utf-8'))).split(', ')
         #print dops, '\n'
 
 
         #print 'Counter Input Channels:'
-        self.cichannels = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevCIPhysicalChans(handle, self.cichannels.ctypes.data, uInt32(1000)))
-        self.cichannels = ''.join(list(self.cichannels)).split(', ')
+        #self.cichannels = numpy.zeros(1000,dtype=numpy.str_)
+        self.cichannels = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevCIPhysicalChans(handle, ctypes.byref(self.cichannels), uInt32(1000)))
+        self.cichannels = ''.join(list(str(self.cichannels.value,'utf-8'))).split(', ')
         #print cichannels, '\n'
 
 
         #print 'Counter Output Channels:'
-        self.cochannels = numpy.zeros(1000,dtype=numpy.str_)
-        CHK(nidaq.DAQmxGetDevCOPhysicalChans(handle, self.cochannels.ctypes.data, uInt32(1000)))
-        self.cochannels = ''.join(list(self.cochannels)).split(', ')
+        #self.cochannels = numpy.zeros(1000,dtype=numpy.str_)
+        self.cochannels = ctypes.create_string_buffer(1000)
+        CHK(nidaq.DAQmxGetDevCOPhysicalChans(handle, ctypes.byref(self.cochannels), uInt32(1000)))
+        self.cochannels = ''.join(list(str(self.cochannels.value,'utf-8'))).split(', ')
         
         #print cochannels, '\n'
     def connect_terms(self, source_ch,destination,modifier=c.DAQmx_Val_DoNotInvertPolarity):
@@ -305,7 +320,7 @@ class pynidaq(daq.daq):
             self.sampleRate = float64(samplerate)
             self.samplesPerChan = uInt64(samplesPerChan)
             
-            self.clockSource = ctypes.create_string_buffer(clock)          
+            self.clockSource = ctypes.create_string_buffer(clock.encode('utf-8'))         
             
             self.aotask = niaotask()
             self.aotask.create_channel(self.channel,
@@ -346,9 +361,9 @@ class pynidaq(daq.daq):
                      contfin='fin',
                      minimum=-10.0,
                      maximum=10.0,
-                     timeout=10.0,
+                     timeout=30.0,
                      samplerate=10000.0,
-                     samplesperchan=2000,
+                     samplesperchan=10000,
                      clock='OnboardClock'):
             class_name = self.__class__.__name__
             #print "class", class_name, "created"
@@ -380,7 +395,7 @@ class pynidaq(daq.daq):
             self.samplesPerChan = uInt64(samplesperchan)
 
 
-            self.clockSource = ctypes.create_string_buffer(clock)
+            self.clockSource = ctypes.create_string_buffer(clock.encode('utf-8'))
             #self.data = numpy.zeros((1000,),dtype=numpy.float64)
 
             self.aitask = niaitask()
@@ -428,14 +443,25 @@ class pynidaq(daq.daq):
                 print ('AcquireAndGraph function requires Matplotlib and Scipy.')
                 return
     
+    
+            
+                
             
             y = self.acquire(num_samples)
             #arange(start,stop,step)
 
-            acqTime = (num_samples/self.sampleRate.value)*1000 # turn into ms
+            acqTime = ((num_samples)/self.sampleRate.value)*1000 # turn into ms
             t = scipy.linspace(0,acqTime,num_samples)
 
-            plt.plot(t,y)
+            print('chan', self.chan)
+            if len(self.chan) == 1:
+                plt.plot(t,y,label=self.chan)
+            else:
+                for i in range(len(self.chan)):
+                    print('y',y)
+                    plt.plot(t,y[i],label=self.chan[i])
+            plt.legend(fontsize=8)#bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+                        #ncol=2, mode="expand", borderaxespad=0.)
             plt.grid(True)
             plt.xlabel('Time(ms)')
             plt.ylabel('Volts')
@@ -463,7 +489,7 @@ class pynidaq(daq.daq):
     class counter_output(daq.daq.counter_output):
         def __init__(self,
                      daqclass,
-                     channel='Dev1/actr0',
+                     channel=('Dev1/actr0',),
                      frequency=100,
                      dutycycle=0.5,
                      delay=0,
@@ -475,7 +501,7 @@ class pynidaq(daq.daq):
             
             
             self.pwmchan = channel
-            print (self.pwmchan)
+            print ('Channel:',self.pwmchan)
             self.pwmchan = ctypes.create_string_buffer(self.pwmchan)
             #self.parentdaq = daqclass
             self.cotask = nicotask()
@@ -507,7 +533,7 @@ class pynidaq(daq.daq):
     class counter_input(daq.daq.counter_input):
         def __init__(self,
                      daqclass,
-                     channel='Dev1/actr0',
+                     channel=('Dev1/actr0',),
                      min_val=1.0,
                      max_val=10000.0,
                      edge='rising',
@@ -535,8 +561,8 @@ class pynidaq(daq.daq):
                 raise
             
             self.cichan = channel
-            print (self.cichan)
-            self.cichan = ctypes.create_string_buffer(self.cichan)
+            print ('Channel:', self.cichan)
+            #self.cichan = ctypes.create_string_buffer(self.cichan)
             #self.parentdaq = daqclass
             self.citask = nicitask()
             #create_channel(self, channel, min_val, max_val, edge, meas_method, meas_time, divisor)
@@ -662,7 +688,7 @@ class pynidaq(daq.daq):
             
         def __del__(self):
             class_name = self.__class__.__name__
-            #print "class", class_name, "destroyed"
+            print ("class", class_name, "destroyed")
 
             if self.ditask.diTaskHandle.value != 0:
                 nidaq.DAQmxStopTask(self.ditask.diTaskHandle)
@@ -710,17 +736,19 @@ def daqfind():
         handle = 'Dev' + str(i)
         simulated = getdevicesimulated(handle)
         # if we received a valid answer not an error
-        if(simulated < 0):
+        if(simulated == None):
             #error returned just check next daq
             pass
-        elif(simulated == 1):
+        elif(simulated == True):
             # the device is just a software simulated device
             handles.append(handle)
             nd = nd + 1 # inc the number of valid daqs counter
         else:
             # we've found a valid hardware ni daq(just maybe not plugged in)
-            serialnumber = numpy.zeros(1,dtype=numpy.uint32)
-            nidaq.DAQmxGetDevSerialNum(handle, serialnumber.data[0])
+            #serialnumber = numpy.zeros(1,dtype=numpy.uint32)
+            serialnumber = ctypes.c_int32()
+            h=ctypes.create_string_buffer(handle.encode('utf-8'))
+            nidaq.DAQmxGetDevSerialNum(h, ctypes.byref(serialnumber))
 
             # this seems to be ni's recommended method. If serial number is
             # zero then device was installed on the system at one time but
@@ -736,16 +764,18 @@ def daqfind():
         # next look for compact chassis'
         handle = 'cDAQ' + str(i)
         simulated = getdevicesimulated(handle)
-        if(simulated < 0):
+        if(simulated == None):
             #error returned just check next daq
             pass
-        elif(simulated == 1):
+        elif(simulated == True):
             # the device is just a software simulated device
             pass
         else:
             # we've found a valid hardware ni daq(just maybe not plugged in)
-            serialnumber = numpy.zeros(1,dtype=numpy.uint32)
-            nidaq.DAQmxGetDevSerialNum(handle, serialnumber.data[0])
+            #serialnumber = numpy.zeros(1,dtype=numpy.uint32)
+            serialnumber = ctypes.c_int32()
+            h=ctypes.create_string_buffer(handle.encode('utf-8'))
+            nidaq.DAQmxGetDevSerialNum(h, ctypes.byref(serialnumber))
 
             # this seems to be ni's recommended method. If serial number is
             # zero then device was installed on the system at one time byt
@@ -777,111 +807,115 @@ def daqfind():
     return handles
 
 def getdevicesimulated(handle='Dev1'):
-    simulated = numpy.zeros(1,dtype=numpy.uint32)
+    #simulated = numpy.zeros(1,dtype=numpy.uint32)
     simulated = ctypes.c_bool()    
-    
+    handle=ctypes.create_string_buffer(handle.encode('utf-8'))
     answer = nidaq.DAQmxGetDevIsSimulated(handle, ctypes.byref(simulated))
     if (int(answer) == 0): # check for a valid reply
-        return simulated
-    return 0
+        return bool(simulated)
+    else:
+        pass #invalid reply not sure what to do here
 
 def getproductcategory(handle='Dev1'):
+    #handle=ctypes.create_string_buffer(handle.encode('utf-8'))
     #ni_cat = resource_filename(__name__, 'data/ni_cat.dat')
     ni_cat = pkgutil.get_data('pydaqtools', 'data/ni_cat.dat')
     #file = open('data/ni_cat.dat', 'rb')
     ni_cat = pickle.loads(ni_cat)
     #file.close()
 
-    category = numpy.zeros(1,dtype=numpy.uint32)
+    category = ctypes.c_int32()
     if os.name == 'nt':
-        nidaq.DAQmxGetDevProductCategory(handle, category.ctypes.data)
-    return ni_cat[str(category[0])]
+        nidaq.DAQmxGetDevProductCategory(handle, ctypes.byref(category))
+    return ni_cat[str(category.value)]
 
 
 def getproductbus(handle='Dev1'):
+    #handle=ctypes.create_string_buffer(handle.encode('utf-8'))
     #ni_bus = resource_filename(__name__, 'data/ni_bus.dat')
     ni_bus = pkgutil.get_data('pydaqtools', 'data/ni_bus.dat')
     #file = open('data/ni_bus.dat', 'rb')
     ni_bus = pickle.loads(ni_bus)
     #file.close()
 
-    bus = numpy.zeros(1,dtype=numpy.uint32)
-    nidaq.DAQmxGetDevBusType(handle, bus.ctypes.data)
-    return ni_bus[str(bus[0])]
+    bus = ctypes.c_int32()
+    nidaq.DAQmxGetDevBusType(handle, ctypes.byref(bus))
+    return ni_bus[str(bus.value)]
 
 def getdevicenumber(handle='Dev1'):
+    #handle=ctypes.create_string_buffer(handle.encode('utf-8'))
     #ni_dev = resource_filename(__name__, 'data/ni_dev.dat')
     ni_dev = pkgutil.get_data('pydaqtools', 'data/ni_dev.dat')
     #file = open('data/ni_dev.dat', 'rb')
     ni_dev = pickle.loads(ni_dev)
     #file.close()
 
-    device = numpy.zeros(1,dtype=numpy.uint32)
-    nidaq.DAQmxGetDevProductNum(handle, device.ctypes.data)
-    return ni_dev[str(device[0])]
+    device = ctypes.c_int32()
+    nidaq.DAQmxGetDevProductNum(handle, ctypes.byref(device))
+    return ni_dev[str(device.value)]
 
 def getnumai(handle='Dev1'):
-    aichannels = numpy.zeros(1000,dtype=numpy.str_)
-    CHK(nidaq.DAQmxGetDevAIPhysicalChans(handle, aichannels.ctypes.data, uInt32(1000)))          # not supported for this device
+    aichannels = ctypes.create_string_buffer(1000)
+    CHK(nidaq.DAQmxGetDevAIPhysicalChans(handle, ctypes.byref(aichannels), uInt32(1000)))          # not supported for this device
         #return int(0)
-    aichannels = ''.join(list(aichannels))
-    if (len(aichannels) == 0):
+    aichannels = ''.join(list(str(aichannels.value)))
+    if (len(aichannels) <= 3):
         return 0
     aichannels = aichannels.rsplit(', ')
     return len(aichannels)
 
 def getnumao(handle='Dev1'):
-    aochannels = numpy.zeros(1000,dtype=numpy.str_)
-    CHK(nidaq.DAQmxGetDevAOPhysicalChans(handle, aochannels.ctypes.data, uInt32(1000)))
+    aochannels = ctypes.create_string_buffer(1000)
+    CHK(nidaq.DAQmxGetDevAOPhysicalChans(handle, ctypes.byref(aochannels), uInt32(1000)))
         # not supported for this device          
         #return int(0)
     
-    aochannels = ''.join(list(aochannels))
-    if (len(aochannels) == 0):
+    aochannels = ''.join(list(str(aochannels.value)))
+    if (len(aochannels) <= 3):
         return 0
     aochannels = aochannels.rsplit(', ')
     return len(aochannels)
 
 def getnumdi(handle='Dev1'):
-    dichannels = numpy.zeros(1000,dtype=numpy.str_)
-    if(nidaq.DAQmxGetDevDILines(handle, dichannels.ctypes.data, uInt32(1000))):
+    dichannels = ctypes.create_string_buffer(1000)
+    if(nidaq.DAQmxGetDevDILines(handle, ctypes.byref(dichannels), uInt32(1000))):
         # not supported for this device
         return int(0)
-    dichannels = ''.join(list(dichannels))
-    if (len(dichannels) == 0):
+    dichannels = ''.join(list(str(dichannels.value)))
+    if (len(dichannels) <= 3):
         return 0        
     dichannels = dichannels.rsplit(', ')
     return len(dichannels)
 
 def getnumdo(handle='Dev1'):
-    dochannels = numpy.zeros(1000,dtype=numpy.str_)
-    if(nidaq.DAQmxGetDevDOLines(handle, dochannels.ctypes.data, uInt32(1000))):
+    dochannels = ctypes.create_string_buffer(1000)
+    if(nidaq.DAQmxGetDevDOLines(handle, ctypes.byref(dochannels), uInt32(1000))):
         # not supported for this device          
         return int(0)
-    dochannels = ''.join(list(dochannels))
-    if (len(dochannels) == 0):
+    dochannels = ''.join(list(str(dochannels.value)))
+    if (len(dochannels) <= 3):
         return 0        
     dochannels = dochannels.rsplit(', ')
     return len(dochannels)
 
 def getnumco(handle='Dev1'):
-    cochannels = numpy.zeros(1000,dtype=numpy.str_)
-    if(nidaq.DAQmxGetDevCOPhysicalChans(handle, cochannels.ctypes.data, uInt32(1000))):
+    cochannels = ctypes.create_string_buffer(1000)
+    if(nidaq.DAQmxGetDevCOPhysicalChans(handle, ctypes.byref(cochannels), uInt32(1000))):
         # not supported for this device          
         return int(0)
-    cochannels = ''.join(list(cochannels))
-    if (len(cochannels) == 0):
+    cochannels = ''.join(list(str(cochannels.value)))
+    if (len(cochannels) <= 3):
         return 0        
     cochannels = cochannels.rsplit(', ')
     return len(cochannels)
 
 def getnumci(handle='Dev1'):
-    cichannels = numpy.zeros(1000,dtype=numpy.str_)
-    if(nidaq.DAQmxGetDevCIPhysicalChans(handle, cichannels.ctypes.data, uInt32(1000))):
+    cichannels = ctypes.create_string_buffer(1000)
+    if(nidaq.DAQmxGetDevCIPhysicalChans(handle, ctypes.byref(cichannels), uInt32(1000))):
         # not supported for this device          
         return int(0)
-    cichannels = ''.join(list(cichannels))
-    if (len(cichannels) == 0):
+    cichannels = ''.join(list(str(cichannels.value)))
+    if (len(cichannels) <= 3):   # this is just an empty binary
         return 0        
     cichannels = cichannels.rsplit(', ')
     return len(cichannels)     
@@ -892,7 +926,8 @@ def getnumci(handle='Dev1'):
     
 class niditask:
     def __init__(self):
-        self.diTaskHandle = TaskHandle(0)
+        #self.diTaskHandle = TaskHandle(0)
+        self.diTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.diTaskHandle)))
         self.numch = 0
         self.ch = {}
@@ -902,29 +937,35 @@ class niditask:
         
     def create_channel(self, channel):
         
-        for ch in channel:
-            chan = ctypes.create_string_buffer(ch)
-            print (chan.value)        
-
-            CHK(nidaq.DAQmxCreateDIChan(self.diTaskHandle,
-                                        chan,
-                                        "",
-                                        c.DAQmx_Val_GroupByChannel))
+        #for ch in channel:
+        #    chan = ctypes.create_string_buffer(ch)
+        #    print (chan.value)        
+        chan = ','.join(channel)
+        chan = ctypes.create_string_buffer(chan.encode('utf-8'))
+        print(chan.value)        
+        CHK(nidaq.DAQmxCreateDIChan(self.diTaskHandle,
+                                    chan,
+                                    "",
+                                    c.DAQmx_Val_GroupByChannel))
         
     def get(self, channel, points):
         
-        self.start()
+        #self.start()
         bufferSize=uInt32(points*len(channel))
 
         samps_read = uInt32()
         bytes_per_sample = uInt32()
-        self.data = numpy.zeros((points*len(channel),),dtype=numpy.uint8)
+        #self.data = numpy.zeros((points*len(channel),),dtype=numpy.uint8)
+        self.samples = (ctypes.c_uint8 * len(channel) * points)()
+        #self.samples = (ctypes.c_double * len(channel) * points)()
+        #self.pointsRead = uInt32()
 
         CHK(nidaq.DAQmxReadDigitalLines(self.diTaskHandle,
                                         uInt32(points), #c.DAQmx_Val_Auto,  # samples per channel
                                         float64(10.0),     # timeout
                                         c.DAQmx_Val_GroupByChannel,    # fill mode
-                                        self.data.ctypes.data,    # read array
+                                        ctypes.byref(self.samples),
+                                        #self.data.ctypes.data,    # read array
                                         uInt32(bufferSize.value), # size of read array
                                         ctypes.byref(samps_read),    # actual num of samples read
                                         ctypes.byref(bytes_per_sample),     # actual number of bytes per sample
@@ -933,7 +974,21 @@ class niditask:
         self.stop()
         #print 'Samples read: ', samps_read
         #print 'Bytes per Sample: ', bytes_per_sample
-        return self.data
+        
+        
+        for i in range(len(channel)):
+            print('i',i)
+            print('points',points)
+            q=numpy.frombuffer(self.samples,'uint8')
+            
+            q=q.reshape(len(channel),points)
+            print (q)        
+        
+        
+        
+        #q=numpy.frombuffer(self.samples,dtype="uint8")
+        #q=numpy.frombuffer(self.samples,dtype="bool")
+        return q
 
     def start(self):
         CHK(nidaq.DAQmxStartTask(self.diTaskHandle))
@@ -944,34 +999,38 @@ class niditask:
 
 class nidotask:
     def __init__(self):
-        self.doTaskHandle = TaskHandle(0)
+        #self.doTaskHandle = TaskHandle(0)
+        self.doTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.doTaskHandle)))
         self.numch = 0
         self.ch = {}
         self.dataout = []
     def create_channel(self, channel):
 
-        for ch in channel:
-            chan = ctypes.create_string_buffer(ch)
-            print (chan.value)        
-        
-            CHK(nidaq.DAQmxCreateDOChan(self.doTaskHandle,
-                                        chan,
-                                        "",
-                                        c.DAQmx_Val_ChanForAllLines))
+        #for ch in channel:
+        #    chan = ctypes.create_string_buffer(ch)
+        #    print (chan.value)        
+        chan = ','.join(channel)
+        chan = ctypes.create_string_buffer(chan.encode('utf-8'))
+        CHK(nidaq.DAQmxCreateDOChan(self.doTaskHandle,
+                                    chan,
+                                    "",
+                                    c.DAQmx_Val_ChanForAllLines))
 
     def set_vals(self, channel, output):
         
-        self.data = numpy.array(output,dtype=numpy.uint8)
-        
+        #self.data = numpy.array(output,dtype=numpy.uint8)
+        #self.data = ctypes.c_int8(output)
+        self.data = (ctypes.c_int8 * 1)(*output)
         self.sampleswritten = uInt32()        
 
         CHK(nidaq.DAQmxWriteDigitalLines(self.doTaskHandle,
-                                         uInt32(len(output)/len(channel)),            # samples per channel
+                                         uInt32(int(len(output)/len(channel))),            # samples per channel
                                          uInt32(1),            # auto start
                                          float64(10.0),        # timeout
                                          c.DAQmx_Val_GroupByChannel,
-                                         self.data.ctypes.data,
+                                         ctypes.byref(self.data),
+                                         #self.data.ctypes.data,
                                          ctypes.byref(self.sampleswritten),
                                          None))
         #print 'Samples Written per Channel:', self.sampleswritten
@@ -983,7 +1042,8 @@ class nidotask:
 
 class niaitask:
     def __init__(self):
-        self.aiTaskHandle = TaskHandle(0)
+        #self.aiTaskHandle = TaskHandle
+        self.aiTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.aiTaskHandle)))
 
         
@@ -998,14 +1058,23 @@ class niaitask:
                        clocksource):
 
 
+        chan=''   
         
-        for ch in channel:
-            chan = ctypes.create_string_buffer(ch)
-            print (chan.value)
-
-            CHK(nidaq.DAQmxCreateAIVoltageChan(self.aiTaskHandle,chan,"",rsediff,minimum,maximum,
+        #chan = ctypes.create_string_buffer(channel[:].encode('utf-8'))      
+        chan = ','.join(channel)
+        #print(chan)
+        #for ch in channel:
+            #print(channel)
+            #print(ch)
+            
+            #chan = ctypes.create_string_buffer(ch[:].encode('utf-8'))
+            
+            #print (str(chan.value,'utf-8'))
+        chan = ctypes.create_string_buffer(chan.encode('utf-8'))
+        print(chan)
+        CHK(nidaq.DAQmxCreateAIVoltageChan(self.aiTaskHandle,chan,"",rsediff,minimum,maximum,
                 c.DAQmx_Val_Volts,None))
-
+        #print(chan.value)
         self.pointsToRead = samplesperchannel
         CHK(nidaq.DAQmxCfgSampClkTiming(self.aiTaskHandle,
                                         clocksource,
@@ -1041,7 +1110,10 @@ class niaitask:
         
 
         #this data array as well needs to be scaled by the number of channels in task
-        self.data = numpy.zeros((points*len(channel),),dtype=numpy.float64)
+        #self.data = numpy.zeros((points*len(channel),),dtype=numpy.float64)
+        #self.data = ctypes.c_double()
+        self.samples = (ctypes.c_double * len(channel) * points)()
+
         self.pointsRead = uInt32()
         
         
@@ -1049,24 +1121,40 @@ class niaitask:
                                      uInt32(int(points)),#c.DAQmx_Val_Auto (Auto means read all available)
                                      float64(10.0),       # timeout
                                      c.DAQmx_Val_GroupByChannel,
-                                     self.data.ctypes.data,
+                                     #self.data.ctypes.data,
+                                     ctypes.byref(self.samples),
                                      uInt32(self.bufferSize.value),
                                      ctypes.byref(self.pointsRead),None))
-
-        #print "Acquired %d point(s)"%(self.pointsRead.value)
-        self.data = self.data.reshape(len(channel),points)
-
+                                     
+        print ("Acquired %d point(s)"%(self.pointsRead.value))
+        #self.samples = self.samples.reshape(len(channel),points)
+        #print (self.samples)        
+        #print (self.samples[0][0],self.samples[0][1],self.samples[1][0],self.samples[1][1])
+        
+        #for i in range(len(channel)):
+            #print('i',i)
+            #print('points',points)
+        q=numpy.frombuffer(self.samples)
+            #print (q)
+        #q=q.reshape(len(channel),points)
+        if len(channel) > 1:
+            q=q.reshape(len(channel),points)
+            #samp[i]=[self.samples[i][j] for j in range(points)]
+        #samp=[self.samples[i] for i in range(self.pointsRead.value)]
+        
+        #list = [weights[i] for i in xrange(ARRAY_SIZE_I_KNOW_IN_ADVANCE)]
         if self.contfin == c.DAQmx_Val_FiniteSamps:
             self.stop()
 
-        return self.data
+        return q
 
 
 
 
 class niaotask:
     def __init__(self):
-        self.aoTaskHandle = TaskHandle(0)
+        #self.aoTaskHandle = TaskHandle(0)
+        self.aoTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.aoTaskHandle)))
         self.ch = {}
         self.dataout = []
@@ -1081,26 +1169,28 @@ class niaotask:
                        samplesperchannel,
                        clocksource):
 
-        for ch in channel:
-            chan = ctypes.create_string_buffer(ch)
-            print (chan.value)
-
+        chan = ','.join(channel)
+        chan = ctypes.create_string_buffer(chan.encode('utf-8'))
+        #for ch in channel:
+        #    chan = ctypes.create_string_buffer(ch)
+        #    print (chan.value)
+        print(chan.value)
             
             
-            CHK(nidaq.DAQmxCreateAOVoltageChan(self.aoTaskHandle,
-                                               chan,
-                                               "",
-                                               minimum,
-                                               maximum,
-                                               c.DAQmx_Val_Volts,None))
+        CHK(nidaq.DAQmxCreateAOVoltageChan(self.aoTaskHandle,
+                                           chan,
+                                           "",
+                                           minimum,
+                                           maximum,
+                                           c.DAQmx_Val_Volts,None))
                
         self.pointsToWrite = samplesperchannel
         CHK(nidaq.DAQmxCfgSampClkTiming(self.aoTaskHandle,
-                                        clocksource,#clock source default to internal
+                                        '',#clocksource,#clock source default to internal
                                         samplerate,
                                         c.DAQmx_Val_Rising,
                                         contfin,
-                                        self.pointsToWrite))            
+                                        self.pointsToWrite.value))            
         
         self.minimum = minimum
         self.maximum = maximum
@@ -1116,18 +1206,27 @@ class niaotask:
         # The minimum samples per channel is 2 this gives a
         # bit of a problem for output_dc
 
-
+        self.stop()
 
         try:
             # the data needs to be in the right format here
             # need to do a reshape
             waveform.reshape(len(waveform)*len(waveform[0]) )            
             samplesperchannel = uInt32(len(waveform))
-            data = numpy.array(waveform, dtype=numpy.float64)
+            #data = numpy.array(waveform, dtype=numpy.float64)
+            #self.samples = (ctypes.c_double * len(channel) * points)()
+            data = (ctypes.c_double * len(waveform))()
+            
         except:
             # this is a little dangerous but if the above fails just load
             # a 2 datapoint array
             data = numpy.array([waveform,waveform], dtype=numpy.float64)
+            
+            data = (ctypes.c_double * 2)(*[waveform,waveform])
+            #data[0]=1.0
+            #data[1]=1.0
+            #lll = [4,7,2,8]
+            #lll_c = (ctypes.c_int * len(lll))(*lll)
 
         
 
@@ -1153,8 +1252,9 @@ class niaotask:
                                       uInt32(1),  #autostart task
                                       float64(10.0), #timeout
                                       c.DAQmx_Val_GroupByChannel,
-                                      data.ctypes.data,
+                                      ctypes.byref(data),
                                       None,None))
+        #self.start()
 
     def start(self):
         CHK(nidaq.DAQmxStartTask(self.aoTaskHandle))
@@ -1165,7 +1265,8 @@ class niaotask:
             
 class nicotask:
     def __init__(self):
-        self.coTaskHandle = TaskHandle(0)
+        #self.coTaskHandle = TaskHandle(0)
+        self.coTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.coTaskHandle)))
         
         self.numch = 0
@@ -1236,7 +1337,8 @@ class nicotask:
 
 class nicitask:
     def __init__(self):
-        self.ciTaskHandle = TaskHandle(0)
+        #self.ciTaskHandle = TaskHandle(0)
+        self.ciTaskHandle = ctypes.c_void_p()
         CHK(nidaq.DAQmxCreateTask("",ctypes.byref(self.ciTaskHandle)))
         
         self.numch = 0
@@ -1245,8 +1347,27 @@ class nicitask:
        
     def create_channel(self, channel, min_val, max_val, edge, meas_method, meas_time, divisor):
 
-
+        chan=''
+        chan = ','.join(channel)
+        chan = ctypes.create_string_buffer(chan.encode('utf-8'))
+        #for ch in channel:
+        #    chan = ctypes.create_string_buffer(ch)
+        #    print (chan.value)
+        print(chan.value)
+        
+        
+        
+        handle='Dev1'
+        handle=ctypes.create_string_buffer(handle.encode('utf-8'))
+        measuretypes = ctypes.create_string_buffer(1000)
+        #CHK(nidaq.DAQmxGetDevAIPhysicalChans(handle, ctypes.byref(aichannels), uInt32(1000)))          # not supported for this device
+        #return int(0)
+        
         #nidaq.DAQmxStopTask(self.ciTaskHandle)
+        #DAQmxGetDevCISupportedMeasTypes(const char device[], int32 *data, uInt32 arraySizeInElements)
+        CHK(nidaq.DAQmxGetDevCISupportedMeasTypes(handle,ctypes.byref(measuretypes),uInt32(1000)))
+        print(measuretypes)
+        print(binascii.hexlify(measuretypes.value))
         """int32 DAQmxCreateCIFreqChan (TaskHandle taskHandle,
                                       const char counter[],
                                       const char nameToAssignToChannel[],
@@ -1259,8 +1380,8 @@ class nicitask:
                                       uInt32 divisor,
                                       const char customScaleName[]);
         """
-        CHK(nidaq.DAQmxCreateCIFreqChan(self.ciTaskHandle,
-                                        channel,
+        '''CHK(nidaq.DAQmxCreateCIFreqChan(self.ciTaskHandle,
+                                        chan,
                                         '', # name to assign to virtual channel
                                         float64(min_val),
                                         float64(max_val),
@@ -1270,10 +1391,16 @@ class nicitask:
                                         float64(meas_time),
                                         uInt32(divisor),
                                         ''))
-                                        
-
-                                        
-        CHK(nidaq.DAQmxCfgImplicitTiming(self.ciTaskHandle,c.DAQmx_Val_FiniteSamps,uInt64(1000)))       
+        CHK(nidaq.DAQmxCfgImplicitTiming(self.ciTaskHandle,c.DAQmx_Val_FiniteSamps,uInt64(1000)))
+        '''                                
+        #DAQmxCreateCICountEdgesChan (TaskHandle taskHandle, const char counter[], const char nameToAssignToChannel[], int32 edge, uInt32 initialCount, int32 countDirection)
+        CHK(nidaq.DAQmxCreateCICountEdgesChan(self.ciTaskHandle,
+                                        chan,
+                                        '',
+                                        edge,
+                                        0,
+                                        c.DAQmx_Val_CountUp))                                      
+               
         #CHK(nidaq.DAQmxStartTask(self.ciTaskHandle))
         
     def stop_channel(self):
@@ -1293,16 +1420,17 @@ class nicitask:
                                     bool32 *reserved);
         """
 
-
-        self.data = numpy.zeros((num_samples,),dtype=numpy.float64)
+        self.data = (ctypes.c_double * num_samples)()
+        #self.data = numpy.zeros((num_samples,),dtype=numpy.float64)
         self.pointsRead = uInt32()
         CHK(nidaq.DAQmxReadCounterF64(self.ciTaskHandle,
                                       num_samples,
                                       float64(10.0), #self.timeout,
-                                      self.data.ctypes.data,
+                                      ctypes.byref(self.data),
                                       uInt32(num_samples),
                                       ctypes.byref(self.pointsRead),None))
+        q=numpy.frombuffer(self.data)
         self.stop_channel()
-        return self.data
+        return q
 
 

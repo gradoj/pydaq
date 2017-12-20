@@ -71,27 +71,27 @@ def daqhwinfo(daqid=0):
         print ('')
     if(alldaqs[daqid].dils):
         print ('Digital Input Lines Channels:')
-        print (alldaqs[daqid].dils)
+        pprint (alldaqs[daqid].dils)
         print ('')
     if(alldaqs[daqid].dips):
         print ('Digital Input Ports:')
-        print (alldaqs[daqid].dips)
+        pprint (alldaqs[daqid].dips)
         print ('')
     if(alldaqs[daqid].dols):
         print ('Digital Output Lines:')
-        print (alldaqs[daqid].dols)
+        pprint (alldaqs[daqid].dols)
         print ('')
     if(alldaqs[daqid].dops):
         print ('Digital Output Ports:')
-        print (alldaqs[daqid].dops)
+        pprint (alldaqs[daqid].dops)
         print ('')
     if(alldaqs[daqid].cichannels):
         print ('Counter Input Channels:')
-        print (alldaqs[daqid].cichannels)
+        pprint (alldaqs[daqid].cichannels)
         print ('')
     if(alldaqs[daqid].cochannels):
         print ('Counter Output Channels:')
-        print (alldaqs[daqid].cochannels)
+        pprint (alldaqs[daqid].cochannels)
         print ('')
 
 def daqfind():
@@ -100,7 +100,7 @@ def daqfind():
     nd = len(alldaqs)
     print ('DAQid     Bus                      Handle       Model           ')
     for i in range(0,nd):
-        print ('%-10s%-25s%-13s%-25s' %(alldaqs[i].id, alldaqs[i].bus, alldaqs[i].handle, alldaqs[i].model))
+        print ('%-10s%-25s%-13s%-25s' %(alldaqs[i].id, alldaqs[i].bus, alldaqs[i].handle.value, alldaqs[i].model))
     print ('')
 
 def connect_terms(daqid, source_channel,
@@ -115,12 +115,12 @@ def connect_terms(daqid, source_channel,
 def analog_output(daqid=0,
                   channel=[0],
                   contfin='fin',
-                  samplerate=44100,
+                  samplerate=100,
                   clock='OnboardClock'):
 
     try:
         alldaqs = find_daqs.get_classes()
-        channels = []        
+        channels = []
         if(isinstance(channel,int)):
             channels.append(alldaqs[daqid].aochannels[channel])
         else:
@@ -142,7 +142,7 @@ def analog_input(daqid=0,
                  channel=[0],
                  rsediff='rse',
                  contfin='fin',
-                 samplerate=10000):
+                 samplerate=1000):
 
     try:
         alldaqs = find_daqs.get_classes()
@@ -153,7 +153,7 @@ def analog_input(daqid=0,
         else:
             for ch in channel:
                 channels.append(alldaqs[daqid].aichannels[ch])
-
+        print('Channels:', channels)
         return alldaqs[daqid].analog_input(daqclass=alldaqs[daqid],
                                              channel=channels,
                                              rsediff=rsediff,
@@ -165,13 +165,21 @@ def analog_input(daqid=0,
         raise
     
 def counter_output(daqid=0,
-                   channel=0,
+                   channel=[0],
                    frequency=100,
                    dutycycle=0.5):
     try:
-        alldaqs = find_daqs.get_classes() 
+        alldaqs = find_daqs.get_classes()
+        channels = []
+        
+        if(isinstance(channel,int)):
+            channels.append(alldaqs[daqid].cochannels[channel])
+        else:
+            for ch in channel:
+                channels.append(alldaqs[daqid].cochannels[ch])
+        print('Channels:', channels)
         return alldaqs[daqid].counter_output(daqclass=alldaqs[daqid],
-                                             channel=alldaqs[daqid].cochannels[channel],
+                                             channel=channels,
                                              frequency=frequency,
                                              dutycycle=dutycycle)
     except IndexError:
@@ -180,7 +188,7 @@ def counter_output(daqid=0,
         raise
     
 def counter_input(daqid=0,
-                  channel=0,
+                  channel=[0],
                   min_val=1.0,
                   max_val=1000.0,
                   edge='rising',
@@ -189,8 +197,16 @@ def counter_input(daqid=0,
                   divisor=1):
     try:
         alldaqs = find_daqs.get_classes()
+        channels = []
+        
+        if(isinstance(channel,int)):
+            channels.append(alldaqs[daqid].cichannels[channel])
+        else:
+            for ch in channel:
+                channels.append(alldaqs[daqid].cichannels[ch])
+        print('Channels:', channels)
         return alldaqs[daqid].counter_input (daqclass=alldaqs[daqid],
-                                             channel=alldaqs[daqid].cichannels[channel])
+                                             channel=channels)
     except IndexError:
         print ('DAQ not found. Invalid daqid.')
     except:
